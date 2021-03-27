@@ -27,6 +27,7 @@ class Trader:
         self.short_ema_window = 3
         self.medium_ema_window = 7  # 6
         self.buy_price = -1
+        self.last_stock_price = -1
         
     """Function called at start of run"""
     def run(self):
@@ -46,33 +47,54 @@ class Trader:
     """Your trading algorithm goes here!
         The function is called continuously"""
     def trade(self):
-        stonks = self.API.getListStocks()
-        first_stonk = stonks[0]
+        first_stonk = 'LAL'
+        money_left = self.API.getUserCash()
+        price = self.API.getPrice(first_stonk)
+        if self.last_stock_price == price:
+            return
+        self.last_stock_price = price
+        max_to_buy = math.floor(money_left / price)
 
-        short_ema = self.get_short_ema(first_stonk)
-        medium_ema = self.get_medium_ema(first_stonk)
+        print(taux)
+        if(taux > 2):
+            self.API.marketBuy(first_stonk, max_to_buy)
+        if(taux < -3):
+            self.API.marketSell(first_stonk, self.API.getUserStocks()[first_stonk])
 
-        if short_ema != -1 and medium_ema != -1:
-            price = self.API.getPrice(first_stonk)
-            money_left = self.API.getUserCash()
 
-            if short_ema > medium_ema:
-                max_to_buy = math.floor(money_left / price)
-                self.API.marketBuy(first_stonk, max_to_buy)
-                self.buy_price = price
-
-            if self.buy_price != -1:
-                taux = self.taux_evolution(self.buy_price, price)
-                #print(taux)
-                if np.abs(taux) > 0.02:
-                    #print("Je vends")
-                    self.API.marketSell(first_stonk, self.API.getUserStocks()[first_stonk])
-                    self.buy_price = -1
-                    #print("J ai vendu")
+        # short_ema = self.get_short_ema(first_stonk)
+        # medium_ema = self.get_medium_ema(first_stonk)
+        #
+        # if short_ema != -1 and medium_ema != -1:
+        #     price = self.API.getPrice(first_stonk)
+        #     money_left = self.API.getUserCash()
+        #
+        #     if short_ema > medium_ema:
+        #         max_to_buy = math.floor(money_left / price)
+        #         self.API.marketBuy(first_stonk, max_to_buy)
+        #         self.buy_price = price
+        #
+        #     if self.buy_price != -1:
+        #         taux = self.taux_evolution(self.buy_price, price)
+        #         #print(taux)
+        #         if np.abs(taux) > 0.02:
+        #             #print("Je vends")
+        #             self.API.marketSell(first_stonk, self.API.getUserStocks()[first_stonk])
+        #             self.buy_price = -1
+        #             #print("J ai vendu")
 
         # if(money_left > 1000):
         #     max_to_buy = math.floor(money_left / price)
         #     self.API.marketBuy(first_stonk, max_to_buy)
+
+    def get_taux(self, stonk, time_variation):
+        past_prices = self.API.getPastPrice(stonk, self.API.getTime() - time_variation, self.API.getTime())
+        prices = []
+        for time, price in past_prices.items():
+            prices.append(float(price))
+
+        return self.taux_evolution(prices[0], prices[-1])
+
 
     def get_short_ema(self, action):
         current_time = self.API.getTime()
