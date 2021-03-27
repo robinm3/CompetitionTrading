@@ -27,13 +27,14 @@ class Trader:
         self.short_ema_window = 3
         self.medium_ema_window = 7  # 6
         self.buy_price = -1
+        self.buy_action = None
         
     """Function called at start of run"""
     def run(self):
         
         """You can add initialization code here"""
-        
-        
+
+
         self.t = threading.currentThread()
         while getattr(self.t, "run", True):
             try:
@@ -48,31 +49,69 @@ class Trader:
     def trade(self):
         stonks = self.API.getListStocks()
         first_stonk = stonks[0]
+        coeff = 0.0
+        current_time = self.API.getTime()
 
         short_ema = self.get_short_ema(first_stonk)
         medium_ema = self.get_medium_ema(first_stonk)
+
+        if self.buy_price == -1:
+            multiple_coeff = {}
+            for action in stonks:
+                if action != "ETF":
+                    last_prices = self.get_last_prices(action, current_time)
+                    action_coeff = self.compute_trend(last_prices)
+                    multiple_coeff[action] = action_coeff
+
+            best_coeff = -1
+            best_action = ""
+            for action, coeff in multiple_coeff.items():
+                if coeff > best_coeff:
+                    best_coeff = coeff
+                    best_action = action
+
+            first_stonk = best_action
+            coeff = best_coeff
+        else:
+            current_price_action = self.get_last_prices(self.buy_action, current_time)
+            coeff = self.compute_trend(current_price_action)
+            #first_stonk = self.buy_action
 
         if short_ema != -1 and medium_ema != -1:
             price = self.API.getPrice(first_stonk)
             money_left = self.API.getUserCash()
 
-            if short_ema > medium_ema:
-                max_to_buy = math.floor(money_left / price)
-                self.API.marketBuy(first_stonk, max_to_buy)
-                self.buy_price = price
-
-            if self.buy_price != -1:
-                taux = self.taux_evolution(self.buy_price, price)
-                #print(taux)
-                if np.abs(taux) > 0.02:
-                    #print("Je vends")
-                    self.API.marketSell(first_stonk, self.API.getUserStocks()[first_stonk])
-                    self.buy_price = -1
-                    #print("J ai vendu")
+            if self.buy_price == -1:  # Buy
+                if short_ema > medium_ema and coeff > 0.005:
+                    max_to_buy = math.floor(money_left / price)
+                    self.API.marketBuy(first_stonk, max_to_buy)
+                    self.buy_price = price
+                    self.buy_action = first_stonk
+                    print("Achat")
+            else:  # Sell
+                if self.buy_price != -1:
+                    taux = self.taux_evolution(self.buy_price, price)
+                    if taux < -0.02 or taux > 0.02:
+                        self.API.marketSell(self.buy_action, self.API.getUserStocks()[self.buy_action])
+                        self.buy_price = -1
+                        print("Vendre")
 
         # if(money_left > 1000):
         #     max_to_buy = math.floor(money_left / price)
         #     self.API.marketBuy(first_stonk, max_to_buy)
+
+    def compute_trend(self, values) -> float:
+        m = max(values[-1], values[0])
+        return (values[-1] / m) - (values[0] / m)
+
+    def get_last_prices(self, action, current_time, window=0) -> list:
+        debut = current_time - timedelta(hours=1, minutes=20)
+        response = self.API.getPastPrice(action, debut, current_time)
+        prices = []
+        for time, price in response.items():
+            prices.append(price)
+
+        return prices
 
     def get_short_ema(self, action):
         current_time = self.API.getTime()
