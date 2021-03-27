@@ -1,6 +1,7 @@
 
 import threading
 import time
+import math
 import numpy
 
 class Trader:
@@ -14,7 +15,7 @@ class Trader:
     """
     
     #Nom de l'equipe:
-    equipe = ''
+    equipe = 'Purple goats'
 
     def __init__(self, API):
         
@@ -34,11 +35,14 @@ class Trader:
             except:
                 pass
             time.sleep(0)
-            
-            
-            
+
     """Your trading algorithm goes here!
         The function is called continuously"""
     def trade(self):
-        pass
-    
+        stonks = self.API.getListStocks()
+        first_stonk = stonks[0]
+        price = self.API.getPrice(first_stonk)
+        money_left = self.API.getUserCash()
+        if(money_left > 1000):
+            max_to_buy = math.floor(money_left / price)
+            self.API.marketBuy(first_stonk, max_to_buy)
